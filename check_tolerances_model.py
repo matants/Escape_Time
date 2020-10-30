@@ -1,8 +1,10 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 np.random.seed(42)
 
-num_sims = 10000
+num_sims = 10
+num_sims_each = 500000
 n = 10
 L = 1
 R = 0.5
@@ -28,13 +30,18 @@ class MarkovChain:
     def __init__(self):
         self.tot_reward = 0
         self.transition_count = 0
-        self.lengths, self.state = self.init_chain()
+        self.lengths = self.init_chain()
+        self.state = RightState(self.lengths, 0)
+
+    def reset(self):
+        self.tot_reward = 0
+        self.transition_count = 0
+        self.state = RightState(self.lengths, 0)
 
     @staticmethod
     def init_chain():
         lengths = noisy_lengths(orig_mid_bounds, tol)
-        starting_state = RightState(lengths, 0)
-        return lengths, starting_state
+        return lengths
 
     def transition(self):
         self.tot_reward += self.state.reward
@@ -114,20 +121,41 @@ class EndState:
 
 def run_simulation():
     mc = MarkovChain()
-    is_done = False
-    while not is_done:
-        is_done, is_reward, tot_reward, transition_count = mc.transition()
-    return is_reward, tot_reward, transition_count
+    is_reward_arr = np.empty(num_sims_each, dtype=bool)
+    tot_reward_arr = np.empty(num_sims_each)
+    transition_count_arr = np.empty(num_sims_each)
+    for i in range(num_sims_each):
+        mc.reset()
+        is_done = False
+        while not is_done:
+            is_done, is_reward, tot_reward, transition_count = mc.transition()
+        is_reward_arr[i], tot_reward_arr[i], transition_count_arr[i] = is_reward, tot_reward, transition_count
+    is_reward_mean = np.mean(is_reward_arr)
+    is_reward_std = np.std(is_reward_arr)
+    tot_reward_arr = tot_reward_arr[is_reward_arr]
+    tot_reward_mean = np.mean(tot_reward_arr)
+    tot_reward_std = np.std(tot_reward_arr)
+    transition_count_arr = transition_count_arr[is_reward_arr]
+    transition_count_mean = np.mean(transition_count_arr)
+    transition_count_std = np.std(transition_count_arr)
+    return is_reward_mean, is_reward_std, tot_reward_mean, tot_reward_std, transition_count_mean, transition_count_std
 
 
 if __name__ == "__main__":
-    is_reward_arr = np.empty(num_sims)
-    tot_reward_arr = np.empty(num_sims)
-    transition_count_arr = np.empty(num_sims)
+    is_reward_mean_arr = np.empty(num_sims)
+    is_reward_std_arr = np.empty(num_sims)
+    tot_reward_mean_arr = np.empty(num_sims)
+    tot_reward_std_arr = np.empty(num_sims)
+    transition_count_mean_arr = np.empty(num_sims)
+    transition_count_std_arr = np.empty(num_sims)
     for i in range(num_sims):
-        is_reward_arr[i], tot_reward_arr[i], transition_count_arr[i] = run_simulation()
-    is_reward_mean = np.mean(is_reward_arr)
-    print(is_reward_mean)
+        is_reward_mean_arr[i], is_reward_std_arr[i], tot_reward_mean_arr[i], tot_reward_std_arr[i], \
+        transition_count_mean_arr[i], transition_count_std_arr[i] = run_simulation()
+    fig, axes = plt.subplots(3, 1)
+    axes[0].errorbar(np.arange(num_sims), is_reward_mean_arr, yerr=is_reward_std_arr/np.sqrt(num_sims_each))
+    axes[1].errorbar(np.arange(num_sims), tot_reward_mean_arr, yerr=tot_reward_std_arr/np.sqrt(num_sims_each))
+    axes[2].errorbar(np.arange(num_sims), transition_count_mean_arr, yerr=transition_count_std_arr/np.sqrt(num_sims_each))
+    for ax in axes:
+        ax.grid()
+    plt.show()
 
-# TODO need to calculate expectancy over same chain, so do each one a couple of times without changing weights
-# TODO add analysis of rewards
